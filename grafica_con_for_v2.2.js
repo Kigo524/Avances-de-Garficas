@@ -12,107 +12,100 @@ const datos = [
     { edad: 20, estatura: 1.52 }, { edad: 25, estatura: 1.56 }
 ];
 
-let svg=null;
-const width_espacio = 1350;
-const height_espacio = 600;
+const margen = { top:30, right:30, botton:70, left:60};
+const ancho = 800 - margen.left - margen.right;
+const alto = 600 - margen.top - margen.bottom;
 
-//configuracion de colores para las barras 
-const color = { fill: "rgb(13, 120, 227)", stroke: "rgb(20,40,60)"}
+//variables globales
+let xActual = 50;
+let edadAnterior = null;
+const anchoBarra = 35;
+const espacioEntreBarras = 4;
+const espacioEntreGrupos = 45;
 
-function setup(){
-    //para crear el lienzo
-    svg = d3
-        .select("#contenedor")
-        .append("svg")
-        .attr("width", width_espacio)
-        .attr("height", height_espacio)
-        .style("background", "#f9f9f9");
-
-    //hago una linea base horizontal, pero le dejo un rango de 60 para los textos
-    const lineaBase = height_espacio - 60
-
-    //para la escala vertical uso d3-scale/linear que mapea metros reales a pixeles
-    const escalaY = d3.scaleLinear()
-        .domain([0, 2])
-        .range([lineaBase, 30]) //para que a altura sea desde la base hsata 30 pixeles antes del tope
+datos.forEach(d => {
+    if (edadAnterior !== null && d.edad !== edadAnterior) {
+        xActual += espacioEntreGrupos; // Salto de grupo
+    }
     
-    //AQUI LA LOGICA PARA AGRUPAR POR EDADES. uso un ordenamiento de js
-    datos.sort((a,b) => a.edad - b.edad); //entiendo que los ordena de forma ascendente 
-    //https://d3js.org/d3-array/sort#sort
-    //esto lo pregunto a la IA porque no me funcionaba con "," y me dijo que con "-" pero no entiendo porques
+    d.posicionX = xActual; // guardamos el X exacto en el dato de la posicion
+    
+    xActual += anchoBarra + espacioEntreBarras; // avanzamos para la siguiente barra
+    edadAnterior = d.edad;
+});
 
-    //y ahora para ordenar esos datos por grupo de forma visual
-    let xActual = 50; //posicion de la primera barra de la izquierda
-    const anchoBarra = 35;
-    const espacioEntreBarras = 4;
-    const espacioEntreGrupos = 45;
-    let edadAnterior = null; //variable para controlar cuando poner los espacios de edades distintas
+const setup = function() {
 
-    //ciclo
-    for(let i=0; i<datos.length; i++){
-        const d= datos[i];
-        /*como se supone que ya esta ordenado, solo busco que cambie la edad para dar el salto*/
-        if(edadAnterior !== null && d.edad !== edadAnterior){
-            xActual += espacioEntreGrupos; //aqui se hace el salto de grupo
-        }
+    //primero los ordeno de menor a mayor
+    datos.sort((a, b) => a.edad - b.edad);
 
-        const esPrimerDatoDeGrupo = (d.edad !== edadAnterior);
+    //para agrupar por edad...
+    datosAgrupados = d3.group(datos, (d) => d.edad); //esto crea un "arreglo" de cada edad
 
-        //eso dibuja una barra
-        dibujarRectangulo(d, xActual, anchoBarra, escalaY, color, esPrimerDatoDeGrupo, lineaBase);
+    crearSVG();
+    crearEjes();
+    crearBarras();
+};
 
-        //ahora se avanza el espacio entre barras
-        xActual += anchoBarra + espacioEntreBarras;
+const crearSVG = function () {
+    lienzo = d3 .select("#contenedor")
+        .append("svg")
+        .attr("width", ancho + margen.left + margen.right)
+        .attr("height", alto + margen.top + margen.bottom)
+        .append("g") //usamos g para agregar todos los datos del svg en un grupo y moverlo como tal
+        .attr("transform", `translate(${margen.left},${margen.top})`);
+};
 
-        //y guardo la edad actual para compararla en la siguiente vuelta
-        edadAnterior = d.edad;
-    }
+//en ejeX, el scaleband se usa para los datos categoricos (textos)
+/*Agarra el ancho total disponible (range) y lo divide en "bandas" 
+según la cantidad de datos (domain). 
+El padding(0.2) deja un 20% de espacio vacío entre cada barra. */
+const crearEjes = function () {
+    //escala para los grupos de edades...
+    escalaX0 = d3.scaleBand()
+        .range([0, ancho])
+        .domain(Array.from(datosAgrupados.keys())) //saca un arreglo de las edades diferentes
+        .padding(0.1); //es como un 10% de espacio entre grupos
 
-    svg.append("text")
-        .attr("x", xActual / 2) 
-        .attr("text-anchor", "middle")
-        .attr("y", lineaBase + 55) // Un poco más abajo para no chocar con los años
-        .style("font-family", "sans-serif")
-        .style("font-weight", "bold")
-        .text("EJE: EDAD");
+    //necesito saber cuantos grupos hay
+    const cantidadGrupos = d3.max(Array.from(datosAgrupados.values()), (d) => d.length);
 
-    svg.append("text")
-        .attr("x", 20) //uso xActual para que varie la distancia de las etiquetas
-        .attr("y", 25)
-        .style("font-family", "sans-serif")
-        .style("font-weight", "bold")
-        .text("EJE: ALTURA (m)");
-}
+    escalaX1 = d3.scaleBand()
+        .domain(d3.range(cantidadGrupos)) //segun cuantos grupos de edades, se va calculando
+        .range([0, escalaX0.bandwidth()])
+        .padding(0.05); //espacio entre barras dentro del grupo
 
-function dibujarRectangulo(dato, x, ancho, escalaY, color, esPrimerDatoDeGrupo, lineaBase){
-    svg .append("rect")
-        .attr("x", x)
-        .attr("y", escalaY(dato.estatura)) //dice donde empieza el rectangulo de arriba a abajo
-        .attr("width", ancho)
-        .attr("height", lineaBase - escalaY(dato.estatura)) //queda: la base menos el tope superior para que se ajuste
-        .attr("fill", color.fill)
-        .attr("stroke", color.stroke)
-        .attr("stroke-width", "2")
+    lienzo.append("g")
+        .attr("transform", `translate(0, ${alto})`)
+        .call(d3.axisBottom(escalaX0))
+        .selectAll("text")
+        .style("font-size", "14px");
 
-    //para el texto de la estatura arriba de cada barra individual
-    svg .append("text")
-        .attr("x", x + (ancho/2)) //que sea la mitad de cada barra
-        .attr("y", escalaY(dato.estatura) -6) //se coloca 6 pixeles arriba de la barra
-        .attr("text-anchor", "middle")
-        .style("font-family", "sans-serif")
-        .style("font-size", "11px")
-        .text(dato.estatura);
+    
+    //para el eje Y
+    escalaY = d3.scaleLinear().domain([0, 2.0]).range([alto, 0]);
 
-    if(esPrimerDatoDeGrupo){
-        svg .append("text")
-            .attr("x", x)
-            .attr("y", lineaBase + 35) //abajo de la linea base
-            .style("font-family", "sans-serif")
-            .style("font-size", "14px")
-            .style("font-weight", "bold")
-            .style("fill", "#333")
-            .text(dato.edad + " años");
-    }
-}
+    lienzo.append("g").call(d3.axisLeft(escalaY));
+};
+
+
+const crearBarras = function () {
+    lienzo
+        .selectAll("rect")
+        .data(datos)
+        .enter()
+        .append("rect")
+        .attr("x", (d) => d.posicionX)
+        .attr("y", (d) => escalaY(d.estatura))
+        .attr("width", 35)
+        .attr("height", (d) => alto - escalaY(d.estatura))
+        .attr("fill", function(d){
+            if (d.edad == "24") {
+                return "#f07a7a";
+            } else {
+                return "#69b3a2";
+            }
+        });
+    };
 
 setup();
