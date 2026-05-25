@@ -12,27 +12,12 @@ const datos = [
     { edad: 20, estatura: 1.52 }, { edad: 25, estatura: 1.56 }
 ];
 
-const margen = { top:30, right:30, botton:70, left:60};
-const ancho = 800 - margen.left - margen.right;
+const margen = { top:30, right:30, bottom:70, left:60};
+const ancho = 1200 - margen.left - margen.right;
 const alto = 600 - margen.top - margen.bottom;
 
 //variables globales
-let xActual = 50;
-let edadAnterior = null;
-const anchoBarra = 35;
-const espacioEntreBarras = 4;
-const espacioEntreGrupos = 45;
-
-datos.forEach(d => {
-    if (edadAnterior !== null && d.edad !== edadAnterior) {
-        xActual += espacioEntreGrupos; // Salto de grupo
-    }
-    
-    d.posicionX = xActual; // guardamos el X exacto en el dato de la posicion
-    
-    xActual += anchoBarra + espacioEntreBarras; // avanzamos para la siguiente barra
-    edadAnterior = d.edad;
-});
+let lienzo, escalaX0, escalaX1, escalaY, datosAgrupados;
 
 const setup = function() {
 
@@ -41,6 +26,13 @@ const setup = function() {
 
     //para agrupar por edad...
     datosAgrupados = d3.group(datos, (d) => d.edad); //esto crea un "arreglo" de cada edad
+
+    //le digo a cada barra que posicion ocupa dentro de su grupo de edad
+    datosAgrupados.forEach((grupo) => {
+        grupo.forEach((d, i) => {
+            d.indiceGrupo = i;
+        });
+    });
 
     crearSVG();
     crearEjes();
@@ -65,7 +57,7 @@ const crearEjes = function () {
     escalaX0 = d3.scaleBand()
         .range([0, ancho])
         .domain(Array.from(datosAgrupados.keys())) //saca un arreglo de las edades diferentes
-        .padding(0.1); //es como un 10% de espacio entre grupos
+        .padding(0.3); //es como un 30% de espacio entre grupos
 
     //necesito saber cuantos grupos hay
     const cantidadGrupos = d3.max(Array.from(datosAgrupados.values()), (d) => d.length);
@@ -93,17 +85,18 @@ const crearBarras = function () {
     lienzo
         .selectAll("rect")
         .data(datos)
-        .enter()
-        .append("rect")
-        .attr("x", (d) => d.posicionX)
+        .join("rect")
+        //posicion x= posicion de la EDAD genral + posicion del indice de la BARRA individual
+        .attr("x", (d) => escalaX0(d.edad) + escalaX1(d.indiceGrupo))
         .attr("y", (d) => escalaY(d.estatura))
-        .attr("width", 35)
+        .attr("width", escalaX1.bandwidth()) //la escala de D3 ajusta el ancho automaticamente
         .attr("height", (d) => alto - escalaY(d.estatura))
+        //como dice en D3 Graph Gallery, pinto una cola o grupo condicional
         .attr("fill", function(d){
-            if (d.edad == "24") {
-                return "#f07a7a";
+            if (d.edad == 24 && d.estatura == 1.79) {
+                return "#f0b57a";
             } else {
-                return "#69b3a2";
+                return "#6995b3";
             }
         });
     };
