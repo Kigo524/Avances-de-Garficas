@@ -13,7 +13,7 @@ const datos = [
 ];
 
 const margen = { top:30, right:30, bottom:70, left:60};
-const ancho = 1200 - margen.left - margen.right;
+const ancho = 1300 - margen.left - margen.right;
 const alto = 600 - margen.top - margen.bottom;
 
 //variables globales
@@ -57,15 +57,16 @@ const crearEjes = function () {
     escalaX0 = d3.scaleBand()
         .range([0, ancho])
         .domain(Array.from(datosAgrupados.keys())) //saca un arreglo de las edades diferentes
-        .padding(0.3); //es como un 30% de espacio entre grupos
+        .padding(0.2); //es como un 30% de espacio entre grupos
 
     //necesito saber cuantos grupos hay
     const cantidadGrupos = d3.max(Array.from(datosAgrupados.values()), (d) => d.length);
 
+    //para el eje X
     escalaX1 = d3.scaleBand()
         .domain(d3.range(cantidadGrupos)) //segun cuantos grupos de edades, se va calculando
         .range([0, escalaX0.bandwidth()])
-        .padding(0.05); //espacio entre barras dentro del grupo
+        .padding(0.1); //espacio entre barras dentro del grupo
 
     lienzo.append("g")
         .attr("transform", `translate(0, ${alto})`)
@@ -73,11 +74,32 @@ const crearEjes = function () {
         .selectAll("text")
         .style("font-size", "14px");
 
+    //aqui el titulo de este eje X
+    lienzo .append("text")
+        .attr("x", ancho / 2) // Lo centra horizontalmente
+        .attr("y", alto + 45) // Lo empuja hacia abajo, debajo del eje X
+        .attr("text-anchor", "middle")
+        .style("font-family", "sans-serif")
+        .style("font-size", "14px")
+        .style("font-weight", "bold")
+        .text("Edad (Años)");
+
     
     //para el eje Y
     escalaY = d3.scaleLinear().domain([0, 2.0]).range([alto, 0]);
 
     lienzo.append("g").call(d3.axisLeft(escalaY));
+
+    //aqui el titulo del eje Y
+    lienzo.append("text")
+        .attr("transform", "rotate(-90)") // Rota el texto 90 grados a la izquierda
+        .attr("x", -alto / 2) // Lo centra a lo largo del eje Y (ahora rotado)
+        .attr("y", -40) // Lo empuja hacia la izquierda, fuera del eje Y
+        .attr("text-anchor", "middle")
+        .style("font-family", "sans-serif")
+        .style("font-size", "14px")
+        .style("font-weight", "bold")
+        .text("Estatura (Metros)");
 };
 
 
@@ -99,6 +121,22 @@ const crearBarras = function () {
                 return "#6995b3";
             }
         });
+
+        //esto es para agrear la estatura arriba de cada barra
+        lienzo
+            .selectAll(".etiqueta-estatura") //selecciono por clase para no mover los ejes
+            .data(datos)
+            .join("text")
+            .attr("class", "etiqueta-estatura")
+            //para la posicion X es: Posicion base de la barra + la mitad de su ancho para centrarlo
+            .attr("x", (d) => escalaX0(d.edad) + escalaX1(d.indiceGrupo) + (escalaX1.bandwidth() /2))
+            //para la posicion y es: altura de la barra menos 5 pixeles para darle separacion
+            .attr("y", (d) => escalaY(d.estatura) - 5)
+            .attr("text-anchor", "middle")
+            .style("font-family", "sans-serif")
+            .style("font-size", "10px")
+            .style("fill", "#333")
+            .text((d) => d.estatura);
     };
 
 setup();
